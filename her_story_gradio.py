@@ -20,9 +20,8 @@ leaders = {
     "Michelle Obama": "Full-body portrait of Michelle Obama, modern formal attire, realistic style"
 }
 
-# Hugging Face API
-HF_API_TOKEN = ""  # Optional free token
-HF_IMAGE_MODEL = "stabilityai/stable-diffusion-2"  # Free-to-use Stable Diffusion model
+HF_API_TOKEN = ""  # optional Hugging Face token
+HF_IMAGE_MODEL = "stabilityai/stable-diffusion-2"
 headers = {"Authorization": f"Bearer {HF_API_TOKEN}"} if HF_API_TOKEN else {}
 
 # -----------------------------
@@ -37,48 +36,46 @@ def generate_avatar(prompt):
             json=payload,
             timeout=60
         )
-        image_bytes = response.content
-        return Image.open(BytesIO(image_bytes))
-    except Exception as e:
-        # Fallback placeholder if image generation fails
-        img = Image.new("RGB", (256, 512), color=(200,200,200))
-        return img
+        return Image.open(BytesIO(response.content))
+    except:
+        return Image.new("RGB", (256, 512), color=(200,200,200))
 
-# Generate all avatars at startup
 avatars = {name: generate_avatar(prompt) for name, prompt in leaders.items()}
 
 # -----------------------------
-# Hugging Face LLM for chat
+# LLM for chat
 # -----------------------------
-HF_LLM_MODEL = "TheBloke/gpt4all-lora-quantized"  # Free model
+HF_LLM_MODEL = "TheBloke/gpt4all-lora-quantized"
 def query_llm(prompt):
     try:
         payload = {"inputs": prompt, "parameters": {"max_new_tokens": 200}}
         response = requests.post(f"https://api-inference.huggingface.co/models/{HF_LLM_MODEL}",
                                  headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
         outputs = response.json()
         return outputs[0]["generated_text"]
-    except Exception as e:
-        return f"⚠️ Error generating response: {str(e)}"
+    except:
+        return "⚠️ Unable to generate response."
 
 # -----------------------------
-# Gradio chatbot function
+# Chat function
 # -----------------------------
 def chat_with_leader(user_input, selected_leader, chat_history):
     leader_prompt = f"You are {selected_leader}. Give leadership and financial literacy advice to a student. Student asks: {user_input}"
     answer = query_llm(leader_prompt)
-    
     chat_history = chat_history or []
     chat_history.append((f"You: {user_input}", f"{selected_leader}: {answer}"))
-    
     avatar_img = avatars[selected_leader]
     return chat_history, avatar_img
 
 # -----------------------------
-# Gradio UI
+# Gradio UI with background
 # -----------------------------
-with gr.Blocks() as demo:
+with gr.Blocks(css="""
+    body {background-image: url('https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1350&q=80');
+          background-size: cover;}
+    .gradio-container {background: rgba(255,255,255,0.85); border-radius: 15px; padding: 20px;}
+""") as demo:
+    
     gr.Markdown("## 🌟 Her Story: AI Women's Leadership Platform")
     
     with gr.Row():
@@ -91,3 +88,4 @@ with gr.Blocks() as demo:
     user_input.submit(chat_with_leader, [user_input, selected_leader, chatbot], [chatbot, avatar_image])
 
 demo.launch()
+
